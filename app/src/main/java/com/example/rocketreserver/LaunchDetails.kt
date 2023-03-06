@@ -32,6 +32,15 @@ fun LaunchDetails(launchId: String) {
     LaunchedEffect(Unit) {
         response = apolloClient.query(LaunchDetailsQuery(launchId)).execute()
     }
+    if (response == null) {
+        Loading()
+    } else {
+        LaunchDetails(response!!)
+    }
+}
+
+@Composable
+private fun LaunchDetails(response: ApolloResponse<LaunchDetailsQuery.Data>) {
     Column(
         modifier = Modifier.padding(16.dp)
     ) {
@@ -39,7 +48,7 @@ fun LaunchDetails(launchId: String) {
             // Mission patch
             AsyncImage(
                 modifier = Modifier.size(160.dp, 160.dp),
-                model = response?.data?.launch?.mission?.missionPatch,
+                model = response.data?.launch?.mission?.missionPatch,
                 placeholder = painterResource(R.drawable.ic_placeholder),
                 error = painterResource(R.drawable.ic_placeholder),
                 contentDescription = "Mission patch"
@@ -51,21 +60,21 @@ fun LaunchDetails(launchId: String) {
                 // Mission name
                 Text(
                     style = MaterialTheme.typography.headlineMedium,
-                    text = response?.data?.launch?.mission?.name ?: ""
+                    text = response.data?.launch?.mission?.name ?: ""
                 )
 
                 // Rocket name
                 Text(
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.headlineSmall,
-                    text = response?.data?.launch?.rocket?.name?.let { "🚀 $it" } ?: "",
+                    text = response.data?.launch?.rocket?.name?.let { "🚀 $it" } ?: "",
                 )
 
                 // Site
                 Text(
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.titleMedium,
-                    text = response?.data?.launch?.site ?: "",
+                    text = response.data?.launch?.site ?: "",
                 )
             }
         }
@@ -79,6 +88,13 @@ fun LaunchDetails(launchId: String) {
         ) {
             Text(text = "Book now")
         }
+    }
+}
+
+@Composable
+private fun Loading() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
     }
 }
 
