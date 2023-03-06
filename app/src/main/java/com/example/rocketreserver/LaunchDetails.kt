@@ -25,23 +25,36 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.apollographql.apollo3.api.ApolloResponse
+import com.apollographql.apollo3.exception.ApolloException
+import com.example.rocketreserver.LaunchDetailsState.Loading
+import com.example.rocketreserver.LaunchDetailsState.ProtocolError
+import com.example.rocketreserver.LaunchDetailsState.Success
+
+private sealed interface LaunchDetailsState {
+    object Loading : LaunchDetailsState
+    data class ProtocolError(val exception: ApolloException) : LaunchDetailsState
+    data class Success(val data: LaunchDetailsQuery.Data) : LaunchDetailsState
+}
 
 @Composable
 fun LaunchDetails(launchId: String) {
-    var response by remember { mutableStateOf<ApolloResponse<LaunchDetailsQuery.Data>?>(null) }
+    var state by remember { mutableStateOf<LaunchDetailsState>(Loading) }
     LaunchedEffect(Unit) {
-        response = apolloClient.query(LaunchDetailsQuery(launchId)).execute()
+        state = try {
+            Success(apolloClient.query(LaunchDetailsQuery(launchId)).execute().data!!)
+        } catch (e: ApolloException) {
+            ProtocolError(e)
+        }
     }
-    if (response == null) {
-        Loading()
-    } else {
-        LaunchDetails(response!!)
+    when (val s = state) {
+        Loading -> Loading()
+        is ProtocolError -> ErrorMessage("Oh no... A protocol error happened: ${s.exception.message}")
+        is Success -> LaunchDetails(s.data)
     }
 }
 
 @Composable
-private fun LaunchDetails(response: ApolloResponse<LaunchDetailsQuery.Data>) {
+private fun LaunchDetails(data: LaunchDetailsQuery.Data) {
     Column(
         modifier = Modifier.padding(16.dp)
     ) {
@@ -49,7 +62,7 @@ private fun LaunchDetails(response: ApolloResponse<LaunchDetailsQuery.Data>) {
             // Mission patch
             AsyncImage(
                 modifier = Modifier.size(160.dp, 160.dp),
-                model = response.data?.launch?.mission?.missionPatch,
+                model = data.launch?.mission?.missionPatch,
                 placeholder = painterResource(R.drawable.ic_placeholder),
                 error = painterResource(R.drawable.ic_placeholder),
                 contentDescription = "Mission patch"
@@ -61,21 +74,21 @@ private fun LaunchDetails(response: ApolloResponse<LaunchDetailsQuery.Data>) {
                 // Mission name
                 Text(
                     style = MaterialTheme.typography.headlineMedium,
-                    text = response.data?.launch?.mission?.name ?: ""
+                    text = data.launch?.mission?.name ?: ""
                 )
 
                 // Rocket name
                 Text(
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.headlineSmall,
-                    text = response.data?.launch?.rocket?.name?.let { "🚀 $it" } ?: "",
+                    text = data.launch?.rocket?.name?.let { "🚀 $it" } ?: "",
                 )
 
                 // Site
                 Text(
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.titleMedium,
-                    text = response.data?.launch?.site ?: "",
+                    text = data.launch?.site ?: "",
                 )
             }
         }
