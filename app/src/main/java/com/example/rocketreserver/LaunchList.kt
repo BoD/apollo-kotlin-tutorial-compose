@@ -24,18 +24,29 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.apollographql.apollo3.api.ApolloResponse
+import com.apollographql.apollo3.api.Optional
 
 @Composable
 fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
+    var cursor: String? by remember { mutableStateOf(null) }
+    var response: ApolloResponse<LaunchListQuery.Data>? by remember { mutableStateOf(null) }
     var launchList by remember { mutableStateOf(emptyList<LaunchListQuery.Launch>()) }
-    LaunchedEffect(Unit) {
-        val response = apolloClient.query(LaunchListQuery()).execute()
-        launchList = response.data?.launches?.launches?.filterNotNull() ?: emptyList()
+    LaunchedEffect(cursor) {
+        response = apolloClient.query(LaunchListQuery(Optional.present(cursor))).execute()
+        launchList = launchList + response?.data?.launches?.launches?.filterNotNull().orEmpty()
     }
 
     LazyColumn {
         items(launchList) { launch ->
             LaunchItem(launch = launch, onClick = onLaunchClick)
+        }
+
+        item {
+            if (response?.data?.launches?.hasMore == true) {
+                LoadingItem()
+                cursor = response?.data?.launches?.cursor
+            }
         }
     }
 }
