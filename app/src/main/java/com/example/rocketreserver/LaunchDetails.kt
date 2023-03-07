@@ -40,7 +40,7 @@ private sealed interface LaunchDetailsState {
 }
 
 @Composable
-fun LaunchDetails(launchId: String) {
+fun LaunchDetails(launchId: String, navigateToLogin: () -> Unit) {
     var state by remember { mutableStateOf<LaunchDetailsState>(Loading) }
     LaunchedEffect(Unit) {
         state = try {
@@ -58,12 +58,15 @@ fun LaunchDetails(launchId: String) {
         Loading -> Loading()
         is ProtocolError -> ErrorMessage("Oh no... A protocol error happened: ${s.exception.message}")
         is BackendError -> ErrorMessage(s.errors[0].message)
-        is Success -> LaunchDetails(s.data)
+        is Success -> LaunchDetails(s.data, navigateToLogin)
     }
 }
 
 @Composable
-private fun LaunchDetails(data: LaunchDetailsQuery.Data) {
+private fun LaunchDetails(
+    data: LaunchDetailsQuery.Data,
+    navigateToLogin: () -> Unit,
+) {
     Column(
         modifier = Modifier.padding(16.dp)
     ) {
@@ -107,11 +110,31 @@ private fun LaunchDetails(data: LaunchDetailsQuery.Data) {
             modifier = Modifier
                 .padding(top = 32.dp)
                 .fillMaxWidth(),
-            onClick = { /*TODO*/ }
+            onClick = {
+                onBookButtonClick(
+                    launchId = data.launch?.id ?: "",
+                    isBooked = data.launch?.isBooked == true,
+                    navigateToLogin = navigateToLogin
+                )
+            }
         ) {
-            Text(text = "Book now")
+            Text(text = if (data.launch?.isBooked != true) "Book now" else "Cancel booking")
         }
     }
+}
+
+private fun onBookButtonClick(launchId: String, isBooked: Boolean, navigateToLogin: () -> Unit): Boolean {
+    if (TokenRepository.getToken() == null) {
+        navigateToLogin()
+        return false
+    }
+
+    if (isBooked) {
+        // TODO Cancel booking
+    } else {
+        // TODO Book
+    }
+    return false
 }
 
 @Composable
@@ -140,5 +163,5 @@ private fun SmallLoading() {
 @Preview(showBackground = true)
 @Composable
 private fun LaunchDetailsPreview() {
-    LaunchDetails(launchId = "42")
+    LaunchDetails(launchId = "42", navigateToLogin = {})
 }
