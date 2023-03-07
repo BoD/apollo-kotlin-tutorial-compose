@@ -43,9 +43,10 @@ private sealed interface LaunchDetailsState {
 @Composable
 fun LaunchDetails(launchId: String, navigateToLogin: () -> Unit) {
     var state by remember { mutableStateOf<LaunchDetailsState>(Loading) }
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         state = try {
-            val response = apolloClient.query(LaunchDetailsQuery(launchId)).execute()
+            val response = apolloClient(context).query(LaunchDetailsQuery(launchId)).execute()
             if (response.hasErrors()) {
                 BackendError(response.errors!!)
             } else {

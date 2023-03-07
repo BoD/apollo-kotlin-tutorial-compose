@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -32,8 +33,9 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
     var cursor: Optional<String?> by remember { mutableStateOf(Optional.absent()) }
     var response: ApolloResponse<LaunchListQuery.Data>? by remember { mutableStateOf(null) }
     var launchList by remember { mutableStateOf(emptyList<LaunchListQuery.Launch>()) }
+    val context = LocalContext.current
     LaunchedEffect(cursor) {
-        response = apolloClient.query(LaunchListQuery(cursor)).execute()
+        response = apolloClient(context).query(LaunchListQuery(cursor)).execute()
         launchList = launchList + (response?.data?.launches?.launches?.filterNotNull() ?: emptyList())
     }
 
