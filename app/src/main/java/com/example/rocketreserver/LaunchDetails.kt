@@ -1,5 +1,6 @@
 package com.example.rocketreserver
 
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +33,7 @@ import com.example.rocketreserver.LaunchDetailsState.BackendError
 import com.example.rocketreserver.LaunchDetailsState.Loading
 import com.example.rocketreserver.LaunchDetailsState.ProtocolError
 import com.example.rocketreserver.LaunchDetailsState.Success
+import kotlinx.coroutines.launch
 
 private sealed interface LaunchDetailsState {
     object Loading : LaunchDetailsState
@@ -104,37 +107,61 @@ private fun LaunchDetails(
                 )
             }
         }
-
         // Book button
+        var loading by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        var isBooked by remember { mutableStateOf(data.launch?.isBooked == true) }
         Button(
             modifier = Modifier
                 .padding(top = 32.dp)
                 .fillMaxWidth(),
+            enabled = !loading,
             onClick = {
-                onBookButtonClick(
-                    launchId = data.launch?.id ?: "",
-                    isBooked = data.launch?.isBooked == true,
-                    navigateToLogin = navigateToLogin
-                )
+                loading = true
+                scope.launch {
+                    val ok = onBookButtonClick(
+                        launchId = data.launch?.id ?: "",
+                        isBooked = isBooked,
+                        navigateToLogin = navigateToLogin
+                    )
+                    if (ok) {
+                        isBooked = !isBooked
+                    }
+                    loading = false
+                }
             }
         ) {
-            Text(text = if (data.launch?.isBooked != true) "Book now" else "Cancel booking")
+            if (loading) {
+                SmallLoading()
+            } else {
+                Text(text = if (!isBooked) "Book now" else "Cancel booking")
+            }
         }
     }
 }
 
-private fun onBookButtonClick(launchId: String, isBooked: Boolean, navigateToLogin: () -> Unit): Boolean {
+private suspend fun onBookButtonClick(launchId: String, isBooked: Boolean, navigateToLogin: () -> Unit): Boolean {
     if (TokenRepository.getToken() == null) {
         navigateToLogin()
         return false
     }
-
-    if (isBooked) {
-        // TODO Cancel booking
+    val mutation = if (isBooked) {
+        CancelTripMutation(id = launchId)
     } else {
-        // TODO Book
+        BookTripMutation(id = launchId)
     }
-    return false
+    val response = try {
+        apolloClient.mutation(mutation).execute()
+    } catch (e: ApolloException) {
+        Log.w("LaunchDetails", "Failed to book/cancel trip", e)
+        return false
+    }
+
+    if (response.hasErrors()) {
+        Log.w("LaunchDetails", "Failed to book/cancel trip: ${response.errors?.get(0)?.message}")
+        return false
+    }
+    return true
 }
 
 @Composable
