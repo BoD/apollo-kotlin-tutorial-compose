@@ -47,7 +47,12 @@ private fun MainNavHost() {
         }
 
         composable(route = "${NavigationDestinations.LAUNCH_DETAILS}/{${NavigationArguments.LAUNCH_ID}}") { navBackStackEntry ->
-            LaunchDetails(launchId = navBackStackEntry.arguments!!.getString(NavigationArguments.LAUNCH_ID)!!)
+            LaunchDetails(
+                launchId = navBackStackEntry.arguments!!.getString(NavigationArguments.LAUNCH_ID)!!,
+                navigateToLogin = {
+                    navController.navigate(NavigationDestinations.LOGIN)
+                }
+            )
         }
 
         composable(route = NavigationDestinations.LOGIN) {

@@ -1,5 +1,6 @@
 package com.example.rocketreserver
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -39,7 +41,7 @@ private sealed interface LaunchDetailsState {
 }
 
 @Composable
-fun LaunchDetails(launchId: String) {
+fun LaunchDetails(launchId: String, navigateToLogin: () -> Unit) {
     var state by remember { mutableStateOf<LaunchDetailsState>(Loading) }
     LaunchedEffect(Unit) {
         state = try {
@@ -57,12 +59,15 @@ fun LaunchDetails(launchId: String) {
         Loading -> Loading()
         is ProtocolError -> ErrorMessage("Oh no... A protocol error happened: ${s.exception.message}")
         is BackendError -> ErrorMessage(s.errors[0].message)
-        is Success -> LaunchDetails(s.data)
+        is Success -> LaunchDetails(s.data, navigateToLogin)
     }
 }
 
 @Composable
-private fun LaunchDetails(data: LaunchDetailsQuery.Data) {
+private fun LaunchDetails(
+    data: LaunchDetailsQuery.Data,
+    navigateToLogin: () -> Unit,
+) {
     Column(
         modifier = Modifier.padding(16.dp)
     ) {
@@ -101,15 +106,35 @@ private fun LaunchDetails(data: LaunchDetailsQuery.Data) {
             }
         }
 
+        val context = LocalContext.current
         // Book button
         Button(
             modifier = Modifier
                 .padding(top = 32.dp)
                 .fillMaxWidth(),
-            onClick = { /*TODO*/ }
+            onClick = {
+                onBookButtonClick(
+                    context = context,
+                    isBooked = data.launch?.isBooked == true,
+                    navigateToLogin = navigateToLogin
+                )
+            }
         ) {
-            Text(text = "Book now")
+            Text(text = if (data.launch?.isBooked != true) "Book now" else "Cancel booking")
         }
+    }
+}
+
+private fun onBookButtonClick(context: Context, isBooked: Boolean, navigateToLogin: () -> Unit) {
+    if (TokenRepository.getToken(context) == null) {
+        navigateToLogin()
+        return
+    }
+
+    if (isBooked) {
+        // TODO Cancel booking
+    } else {
+        // TODO Book
     }
 }
 
@@ -130,5 +155,5 @@ private fun Loading() {
 @Preview(showBackground = true)
 @Composable
 private fun LaunchDetailsPreview() {
-    LaunchDetails(launchId = "42")
+    LaunchDetails(launchId = "42", navigateToLogin = {})
 }
