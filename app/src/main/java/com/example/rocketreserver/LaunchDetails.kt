@@ -1,6 +1,7 @@
 package com.example.rocketreserver
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +35,7 @@ import com.example.rocketreserver.LaunchDetailsState.BackendError
 import com.example.rocketreserver.LaunchDetailsState.Loading
 import com.example.rocketreserver.LaunchDetailsState.ProtocolError
 import com.example.rocketreserver.LaunchDetailsState.Success
+import kotlinx.coroutines.launch
 
 private sealed interface LaunchDetailsState {
     object Loading : LaunchDetailsState
@@ -106,37 +110,72 @@ private fun LaunchDetails(
                 )
             }
         }
-
-        val context = LocalContext.current
         // Book button
+        var loading by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+        val context = LocalContext.current
+        var isBooked by remember { mutableStateOf(data.launch?.isBooked == true) }
         Button(
             modifier = Modifier
                 .padding(top = 32.dp)
                 .fillMaxWidth(),
+            enabled = !loading,
             onClick = {
-                onBookButtonClick(
-                    context = context,
-                    isBooked = data.launch?.isBooked == true,
-                    navigateToLogin = navigateToLogin
-                )
+                loading = true
+                scope.launch {
+                    val ok = onBookButtonClick(
+                        context = context,
+                        isBooked = isBooked,
+                        launchId = data.launch?.id ?: "",
+                        navigateToLogin = navigateToLogin
+                    )
+                    if (ok) {
+                        isBooked = !isBooked
+                    }
+                    loading = false
+                }
             }
         ) {
-            Text(text = if (data.launch?.isBooked != true) "Book now" else "Cancel booking")
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = LocalContentColor.current,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(text = if (!isBooked) "Book now" else "Cancel booking")
+            }
         }
     }
 }
 
-private fun onBookButtonClick(context: Context, isBooked: Boolean, navigateToLogin: () -> Unit) {
+private suspend fun onBookButtonClick(
+    context: Context,
+    isBooked: Boolean,
+    launchId: String,
+    navigateToLogin: () -> Unit,
+): Boolean {
     if (TokenRepository.getToken(context) == null) {
         navigateToLogin()
-        return
+        return false
+    }
+    val mutation = if (isBooked) {
+        CancelTripMutation(id = launchId)
+    } else {
+        BookTripMutation(id = launchId)
+    }
+    val response = try {
+        apolloClient(context).mutation(mutation).execute()
+    } catch (e: ApolloException) {
+        Log.w("LaunchDetails", "Failed to book/cancel trip", e)
+        return false
     }
 
-    if (isBooked) {
-        // TODO Cancel booking
-    } else {
-        // TODO Book
+    if (response.hasErrors()) {
+        Log.w("LaunchDetails", "Failed to book/cancel trip: ${response.errors?.get(0)?.message}")
+        return false
     }
+    return true
 }
 
 @Composable
