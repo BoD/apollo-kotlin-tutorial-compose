@@ -22,6 +22,7 @@ import com.example.rocketreserver.ui.theme.RocketReserverTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        TokenRepository.init(this)
         setContent {
             RocketReserverTheme {
                 Scaffold(topBar = { TopAppBar({ Text(stringResource(R.string.app_name)) }) }) { paddingValues ->
