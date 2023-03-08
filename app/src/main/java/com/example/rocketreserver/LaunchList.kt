@@ -30,13 +30,13 @@ import com.apollographql.apollo3.api.Optional
 
 @Composable
 fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
-    var cursor: Optional<String?> by remember { mutableStateOf(Optional.absent()) }
+    var cursor: String? by remember { mutableStateOf(null) }
     var response: ApolloResponse<LaunchListQuery.Data>? by remember { mutableStateOf(null) }
     var launchList by remember { mutableStateOf(emptyList<LaunchListQuery.Launch>()) }
     val context = LocalContext.current
     LaunchedEffect(cursor) {
-        response = apolloClient(context).query(LaunchListQuery(cursor)).execute()
-        launchList = launchList + (response?.data?.launches?.launches?.filterNotNull() ?: emptyList())
+        response = apolloClient(context).query(LaunchListQuery(Optional.present(cursor))).execute()
+        launchList = launchList + response?.data?.launches?.launches?.filterNotNull().orEmpty()
     }
 
     LazyColumn {
@@ -47,7 +47,7 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
         item {
             if (response?.data?.launches?.hasMore == true) {
                 LoadingItem()
-                cursor = Optional.present(response?.data?.launches?.cursor)
+                cursor = response?.data?.launches?.cursor
             }
         }
     }
