@@ -16,7 +16,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,11 +30,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.apollographql.apollo3.api.Error
+import com.apollographql.apollo3.cache.normalized.watch
 import com.apollographql.apollo3.exception.ApolloException
 import com.example.rocketreserver.LaunchDetailsState.BackendError
 import com.example.rocketreserver.LaunchDetailsState.Loading
 import com.example.rocketreserver.LaunchDetailsState.ProtocolError
 import com.example.rocketreserver.LaunchDetailsState.Success
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private sealed interface LaunchDetailsState {
@@ -46,20 +49,21 @@ private sealed interface LaunchDetailsState {
 
 @Composable
 fun LaunchDetails(launchId: String, navigateToLogin: () -> Unit) {
-    var state by remember { mutableStateOf<LaunchDetailsState>(Loading) }
     val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        state = try {
-            val response = apolloClient(context).query(LaunchDetailsQuery(launchId)).execute()
-            if (response.hasErrors()) {
-                BackendError(response.errors!!)
-            } else {
-                Success(response.data!!)
+    val launchDetailsFlow = remember {
+        apolloClient(context).query(LaunchDetailsQuery(launchId)).watch(fetchThrows = true)
+            .map { response ->
+                if (response.hasErrors()) {
+                    BackendError(response.errors!!)
+                } else {
+                    Success(response.data!!)
+                }
             }
-        } catch (e: ApolloException) {
-            ProtocolError(e)
-        }
+            .catch { e ->
+                emit(ProtocolError(e as ApolloException))
+            }
     }
+    val state by launchDetailsFlow.collectAsState(initial = Loading)
     when (val s = state) {
         Loading -> Loading()
         is ProtocolError -> ErrorMessage("Oh no... A protocol error happened: ${s.exception.message}")

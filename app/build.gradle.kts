@@ -63,6 +63,7 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha05")
 
     implementation("com.apollographql.apollo3:apollo-runtime")
+    implementation("com.apollographql.apollo3:apollo-normalized-cache")
 
     implementation("io.coil-kt:coil-compose:2.2.2")
 

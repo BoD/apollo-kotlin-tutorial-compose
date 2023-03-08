@@ -1,0 +1,3 @@
+extend type Launch @typePolicy(keyFields: "id")
+
+extend type Query @fieldPolicy(forField: "launch", keyArgs: "id")

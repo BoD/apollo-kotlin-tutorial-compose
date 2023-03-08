@@ -3,6 +3,8 @@ package com.example.rocketreserver
 import android.content.Context
 import android.util.Log
 import com.apollographql.apollo3.ApolloClient
+import com.apollographql.apollo3.cache.normalized.api.MemoryCacheFactory
+import com.apollographql.apollo3.cache.normalized.normalizedCache
 import com.apollographql.apollo3.network.okHttpClient
 import kotlinx.coroutines.delay
 import okhttp3.Interceptor
@@ -42,6 +44,7 @@ fun apolloClient(context: Context): ApolloClient {
             delay(attempt * 1000)
             true
         }
+        .normalizedCache(MemoryCacheFactory(maxSizeBytes = 10 * 1024 * 1024))
         .build()
 
     return instance!!

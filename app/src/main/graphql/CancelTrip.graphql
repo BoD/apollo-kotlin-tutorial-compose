@@ -4,6 +4,7 @@ mutation CancelTrip($id: ID!) {
         message
         launches {
             id
+            isBooked
         }
     }
 }
