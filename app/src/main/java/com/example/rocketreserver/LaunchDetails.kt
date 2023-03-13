@@ -31,19 +31,13 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LaunchDetails(launchId: String, navigateToLogin: () -> Unit) {
-    val state by apolloClient.query(LaunchDetailsQuery(launchId)).toState()
-    when (val s = state) {
-        is ApolloState.Loading -> Loading()
-        is ApolloState.Exception -> ErrorMessage("Oh no... A protocol error happened: ${s.exception.message}")
-        is ApolloState.Response -> {
-            val response = s.response
-            if (response.hasErrors()) {
-                ErrorMessage(response.errors!![0].message)
-            } else {
-                val data = response.data!!
-                LaunchDetails(data, navigateToLogin)
-            }
-        }
+    val response by apolloClient.query(LaunchDetailsQuery(launchId)).toState()
+    val r = response
+    when {
+        r == null -> Loading()
+        r.exception != null -> ErrorMessage("Oh no... A protocol error happened: ${r.exception!!.message}")
+        r.hasErrors() -> ErrorMessage(r.errors!![0].message)
+        else -> LaunchDetails(r.data!!, navigateToLogin)
     }
 }
 

@@ -18,7 +18,6 @@ import com.apollographql.apollo3.network.okHttpClient
 import com.benasher44.uuid.uuid4
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.map
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
@@ -55,20 +54,13 @@ val apolloClient = ApolloClient.Builder()
     .build()
 
 
-sealed interface ApolloState<D : Operation.Data> {
-    class Loading<D : Operation.Data> : ApolloState<D>
-    class Exception<D : Operation.Data>(val exception: ApolloException) : ApolloState<D>
-    class Response<D : Operation.Data>(val response: ApolloResponse<D>) : ApolloState<D>
-}
-
 @Composable
-fun <D : Operation.Data> ApolloCall<D>.toState(context: CoroutineContext = EmptyCoroutineContext): State<ApolloState<D>> {
+fun <D : Operation.Data> ApolloCall<D>.toState(context: CoroutineContext = EmptyCoroutineContext): State<ApolloResponse<D>?> {
     val responseFlow = remember {
         toFlow()
-            .map<ApolloResponse<D>, ApolloState<D>> { ApolloState.Response(it) }
-            .catch { emit(ApolloState.Exception(it as? ApolloException ?: throw it)) }
+            .catch { emit(ApolloResponse(this@toState, it as? ApolloException ?: throw it)) }
     }
-    return responseFlow.collectAsState(initial = ApolloState.Loading<D>() as ApolloState<D>, context = context)
+    return responseFlow.collectAsState(initial = null, context = context)
 }
 
 
