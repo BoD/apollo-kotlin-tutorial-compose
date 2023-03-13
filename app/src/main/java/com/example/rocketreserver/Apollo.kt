@@ -81,7 +81,6 @@ class PaginationState<D : Operation.Data, T : Any>(
     private var list: List<T> = emptyList()
     private val response = mutableStateOf<ApolloResponse<D>?>(null)
     private val shouldLoadMore = mutableStateOf(true)
-    private val isLoadingFirstPage = mutableStateOf(true)
 
     private suspend fun doLoadMore(): List<T> {
         val call = nextCall(response.value)
@@ -92,7 +91,6 @@ class PaginationState<D : Operation.Data, T : Any>(
         }
         list = merge(list, response.value!!)
         shouldLoadMore.value = false
-        if (isLoadingFirstPage.value) isLoadingFirstPage.value = false
         return list
     }
 
@@ -108,11 +106,9 @@ class PaginationState<D : Operation.Data, T : Any>(
         return list
     }
 
-    @Composable
-    fun isLoadingFirstPage(): State<Boolean> {
-        return remember { isLoadingFirstPage }
-    }
-
+    /**
+     * The latest received response. This is null while loading the first page.
+     */
     @Composable
     fun response(): State<ApolloResponse<D>?> {
         return remember { response }

@@ -31,9 +31,8 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
         hasMore = { response -> response.data?.launches?.hasMore == true },
     )
     val paginatedList by paginationState.list()
-    val isLoadingFirstPage by paginationState.isLoadingFirstPage()
-    val lastResponse by paginationState.response()
-    if (isLoadingFirstPage) {
+    val response by paginationState.response()
+    if (response == null) {
         Loading()
     } else {
         LazyColumn {
@@ -43,8 +42,8 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
 
             item {
                 when {
-                    lastResponse?.exception != null -> {
-                        Text(text = "Error: ${lastResponse?.exception?.message}")
+                    response?.exception != null -> {
+                        Text(text = "Error: ${response?.exception?.message}")
                     }
 
                     paginationState.hasMore() -> {
