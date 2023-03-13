@@ -32,6 +32,7 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
     )
     val paginatedList by paginationState.list()
     val isLoadingFirstPage by paginationState.isLoadingFirstPage()
+    val lastResponse by paginationState.response()
     if (isLoadingFirstPage) {
         Loading()
     } else {
@@ -41,9 +42,15 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
             }
 
             item {
-                if (paginationState.hasMore()) {
-                    LoadingItem()
-                    paginationState.loadMore()
+                when {
+                    lastResponse?.exception != null -> {
+                        Text(text = "Error: ${lastResponse?.exception?.message}")
+                    }
+
+                    paginationState.hasMore() -> {
+                        LoadingItem()
+                        paginationState.loadMore()
+                    }
                 }
             }
         }

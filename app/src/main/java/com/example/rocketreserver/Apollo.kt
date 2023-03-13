@@ -11,9 +11,11 @@ import androidx.compose.runtime.remember
 import com.apollographql.apollo3.ApolloCall
 import com.apollographql.apollo3.ApolloClient
 import com.apollographql.apollo3.api.ApolloResponse
+import com.apollographql.apollo3.api.ExecutionContext
 import com.apollographql.apollo3.api.Operation
 import com.apollographql.apollo3.exception.ApolloException
 import com.apollographql.apollo3.network.okHttpClient
+import com.benasher44.uuid.uuid4
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -85,13 +87,18 @@ class PaginationState<D : Operation.Data, T : Any>(
     private val hasMore: (response: ApolloResponse<D>) -> Boolean,
 ) {
     private var list: List<T> = emptyList()
-    private var response: ApolloResponse<D>? = null
+    private val response = mutableStateOf<ApolloResponse<D>?>(null)
     private val shouldLoadMore = mutableStateOf(true)
     private val isLoadingFirstPage = mutableStateOf(true)
 
     private suspend fun doLoadMore(): List<T> {
-        response = nextCall(response).execute()
-        list = merge(list, response!!)
+        val call = nextCall(response.value)
+        response.value = try {
+            call.execute()
+        } catch (e: ApolloException) {
+            ApolloResponse(call = call, exception = e)
+        }
+        list = merge(list, response.value!!)
         shouldLoadMore.value = false
         if (isLoadingFirstPage.value) isLoadingFirstPage.value = false
         return list
@@ -114,8 +121,13 @@ class PaginationState<D : Operation.Data, T : Any>(
         return remember { isLoadingFirstPage }
     }
 
+    @Composable
+    fun response(): State<ApolloResponse<D>?> {
+        return remember { response }
+    }
+
     fun hasMore(): Boolean {
-        return response?.let { hasMore(it) } ?: true
+        return response.value?.let { hasMore(it) } ?: true
     }
 
     fun loadMore() {
@@ -124,3 +136,17 @@ class PaginationState<D : Operation.Data, T : Any>(
         }
     }
 }
+
+val ApolloResponse<*>.exception: ApolloException?
+    get() = executionContext[ExceptionElement]?.exception
+
+class ExceptionElement(val exception: ApolloException) : ExecutionContext.Element {
+    override val key: ExecutionContext.Key<*> = Key
+
+    companion object Key : ExecutionContext.Key<ExceptionElement>
+}
+
+fun <D : Operation.Data> ApolloResponse(call: ApolloCall<D>, exception: ApolloException) =
+    ApolloResponse.Builder(operation = call.operation, requestUuid = uuid4(), data = null)
+        .addExecutionContext(ExceptionElement(exception))
+        .build()
