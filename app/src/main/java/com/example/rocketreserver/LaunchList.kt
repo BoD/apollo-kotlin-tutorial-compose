@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
@@ -30,23 +31,27 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
         merge = { acc, response -> acc + response.data?.launches?.launches?.filterNotNull().orEmpty() },
         hasMore = { response -> response.data?.launches?.hasMore == true },
     )
-    val paginatedList by paginationState.list()
-    val response by paginationState.response()
-    if (response == null) {
+    val list by paginationState.list()
+    val l = list
+    if (l == null) {
         Loading()
     } else {
         LazyColumn {
-            items(paginatedList) { launch ->
+            items(l.items) { launch ->
                 LaunchItem(launch = launch, onClick = onLaunchClick)
             }
 
             item {
                 when {
-                    response?.exception != null -> {
-                        Text(text = "Error: ${response?.exception?.message}")
+                    l.exception != null -> {
+                        ErrorItem(text = "Error: ${l.exception.message}", onClick = { paginationState.loadMore() })
                     }
 
-                    paginationState.hasMore() -> {
+                    !l.errors.isNullOrEmpty() -> {
+                        ErrorItem(text = "Error: ${l.errors[0].message}", onClick = { paginationState.loadMore() })
+                    }
+
+                    l.hasMore -> {
                         LoadingItem()
                         paginationState.loadMore()
                     }
@@ -80,6 +85,21 @@ private fun LaunchItem(launch: LaunchListQuery.Launch, onClick: (launchId: Strin
         }
     )
 }
+
+@Composable
+private fun ErrorItem(text: String, onClick: () -> Unit) {
+    ListItem(
+        headlineText = {
+            Text(text = text)
+        },
+        trailingContent = {
+            Button(onClick = onClick) {
+                Text(text = "Retry")
+            }
+        }
+    )
+}
+
 
 @Composable
 private fun LoadingItem() {

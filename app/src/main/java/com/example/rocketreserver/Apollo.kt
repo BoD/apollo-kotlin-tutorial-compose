@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import com.apollographql.apollo3.ApolloCall
 import com.apollographql.apollo3.ApolloClient
 import com.apollographql.apollo3.api.ApolloResponse
+import com.apollographql.apollo3.api.Error
 import com.apollographql.apollo3.api.ExecutionContext
 import com.apollographql.apollo3.api.Operation
 import com.apollographql.apollo3.exception.ApolloException
@@ -78,25 +79,43 @@ class PaginationState<D : Operation.Data, T : Any>(
     private val merge: (acc: List<T>, response: ApolloResponse<D>) -> List<T>,
     private val hasMore: (response: ApolloResponse<D>) -> Boolean,
 ) {
-    private var list: List<T> = emptyList()
-    private val response = mutableStateOf<ApolloResponse<D>?>(null)
-    private val shouldLoadMore = mutableStateOf(true)
+    class ApolloList<T : Any>(
+        val items: List<T>,
+        val exception: Exception?,
+        val errors: List<Error>?,
+        val hasMore: Boolean,
+    )
 
-    private suspend fun doLoadMore(): List<T> {
-        val call = nextCall(response.value)
-        response.value = try {
+    private var response: ApolloResponse<D>? = null
+    private var items: List<T> = emptyList()
+    private val shouldLoadMore = mutableStateOf(true)
+    private var _hasMore: Boolean = true
+
+    private suspend fun doLoadMore(): ApolloList<T> {
+        val call = nextCall(response)
+        response = try {
             call.execute()
         } catch (e: ApolloException) {
             ApolloResponse(call = call, exception = e)
         }
-        list = merge(list, response.value!!)
         shouldLoadMore.value = false
-        return list
+        val itemsBeforeMerging = items
+        items = merge(items, response!!)
+        _hasMore = if (response!!.exception != null || response!!.hasErrors() && itemsBeforeMerging == items) {
+            // Due to an exception or errors, merge could not be done, but there could still be more items
+            true
+        } else {
+            hasMore(response!!)
+        }
+        return ApolloList(items = items, exception = response!!.exception, errors = response!!.errors, hasMore = _hasMore)
     }
 
+    /**
+     * This is null during initial load.
+     */
     @Composable
-    fun list(): State<List<T>> {
-        val list = remember { mutableStateOf(emptyList<T>()) }
+    fun list(): State<ApolloList<T>?> {
+        val list = remember { mutableStateOf<ApolloList<T>?>(null) }
         val shouldLoadMore by remember { shouldLoadMore }
         LaunchedEffect(shouldLoadMore) {
             if (shouldLoadMore) {
@@ -106,20 +125,8 @@ class PaginationState<D : Operation.Data, T : Any>(
         return list
     }
 
-    /**
-     * The latest received response. This is null while loading the first page.
-     */
-    @Composable
-    fun response(): State<ApolloResponse<D>?> {
-        return remember { response }
-    }
-
-    fun hasMore(): Boolean {
-        return response.value?.let { hasMore(it) } ?: true
-    }
-
     fun loadMore() {
-        if (hasMore()) {
+        if (_hasMore) {
             shouldLoadMore.value = true
         }
     }
