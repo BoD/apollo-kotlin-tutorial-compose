@@ -14,38 +14,31 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.apollographql.apollo3.api.ApolloResponse
 import com.apollographql.apollo3.api.Optional
 
 @Composable
 fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
-    var cursor: String? by remember { mutableStateOf(null) }
-    var response: ApolloResponse<LaunchListQuery.Data>? by remember { mutableStateOf(null) }
-    var launchList by remember { mutableStateOf(emptyList<LaunchListQuery.Launch>()) }
-    LaunchedEffect(cursor) {
-        response = apolloClient.query(LaunchListQuery(Optional.present(cursor))).execute()
-        launchList = launchList + response?.data?.launches?.launches?.filterNotNull().orEmpty()
-    }
-
+    val paginationState = rememberPaginationState<LaunchListQuery.Data, LaunchListQuery.Launch>(
+        nextCall = { response -> apolloClient.query(LaunchListQuery(Optional.present(response?.data?.launches?.cursor))) },
+        merge = { acc, response -> acc + response.data?.launches?.launches?.filterNotNull().orEmpty() },
+        hasMore = { response -> response.data?.launches?.hasMore == true },
+    )
+    val paginatedList by paginatedList(paginationState)
     LazyColumn {
-        items(launchList) { launch ->
+        items(paginatedList) { launch ->
             LaunchItem(launch = launch, onClick = onLaunchClick)
         }
 
         item {
-            if (response?.data?.launches?.hasMore == true) {
+            if (paginationState.hasMore()) {
                 LoadingItem()
-                cursor = response?.data?.launches?.cursor
+                paginationState.loadMore()
             }
         }
     }
