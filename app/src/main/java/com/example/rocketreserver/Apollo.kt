@@ -71,18 +71,6 @@ fun <D : Operation.Data> ApolloCall<D>.toState(context: CoroutineContext = Empty
 
 
 @Composable
-fun <D : Operation.Data, T : Any> paginatedList(paginationState: PaginationState<D, T>): State<List<T>> {
-    val list = remember { mutableStateOf(emptyList<T>()) }
-    val shouldLoadMore by remember { paginationState.shouldLoadMore }
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) {
-            list.value = paginationState.doLoadMore()
-        }
-    }
-    return list
-}
-
-@Composable
 fun <D : Operation.Data, T : Any> rememberPaginationState(
     nextCall: (response: ApolloResponse<D>?) -> ApolloCall<D>,
     merge: (acc: List<T>, response: ApolloResponse<D>) -> List<T>,
@@ -98,13 +86,32 @@ class PaginationState<D : Operation.Data, T : Any>(
 ) {
     private var list: List<T> = emptyList()
     private var response: ApolloResponse<D>? = null
-    internal val shouldLoadMore = mutableStateOf(true)
+    private val shouldLoadMore = mutableStateOf(true)
+    private val isLoadingFirstPage = mutableStateOf(true)
 
-    internal suspend fun doLoadMore(): List<T> {
+    private suspend fun doLoadMore(): List<T> {
         response = nextCall(response).execute()
         list = merge(list, response!!)
         shouldLoadMore.value = false
+        if (isLoadingFirstPage.value) isLoadingFirstPage.value = false
         return list
+    }
+
+    @Composable
+    fun list(): State<List<T>> {
+        val list = remember { mutableStateOf(emptyList<T>()) }
+        val shouldLoadMore by remember { shouldLoadMore }
+        LaunchedEffect(shouldLoadMore) {
+            if (shouldLoadMore) {
+                list.value = doLoadMore()
+            }
+        }
+        return list
+    }
+
+    @Composable
+    fun isLoadingFirstPage(): State<Boolean> {
+        return remember { isLoadingFirstPage }
     }
 
     fun hasMore(): Boolean {

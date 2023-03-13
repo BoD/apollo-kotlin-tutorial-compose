@@ -4,6 +4,7 @@ package com.example.rocketreserver
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,16 +30,21 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
         merge = { acc, response -> acc + response.data?.launches?.launches?.filterNotNull().orEmpty() },
         hasMore = { response -> response.data?.launches?.hasMore == true },
     )
-    val paginatedList by paginatedList(paginationState)
-    LazyColumn {
-        items(paginatedList) { launch ->
-            LaunchItem(launch = launch, onClick = onLaunchClick)
-        }
+    val paginatedList by paginationState.list()
+    val isLoadingFirstPage by paginationState.isLoadingFirstPage()
+    if (isLoadingFirstPage) {
+        Loading()
+    } else {
+        LazyColumn {
+            items(paginatedList) { launch ->
+                LaunchItem(launch = launch, onClick = onLaunchClick)
+            }
 
-        item {
-            if (paginationState.hasMore()) {
-                LoadingItem()
-                paginationState.loadMore()
+            item {
+                if (paginationState.hasMore()) {
+                    LoadingItem()
+                    paginationState.loadMore()
+                }
             }
         }
     }
@@ -77,6 +83,13 @@ private fun LoadingItem() {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
+        CircularProgressIndicator()
+    }
+}
+
+@Composable
+private fun Loading() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
 }
