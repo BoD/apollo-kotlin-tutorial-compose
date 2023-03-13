@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,34 +25,32 @@ import com.apollographql.apollo3.api.Optional
 
 @Composable
 fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
-    val paginationState = rememberPaginationState<LaunchListQuery.Data, LaunchListQuery.Launch>(
+    val list by apolloList<LaunchListQuery.Data, LaunchListQuery.Launch>(
         nextCall = { response -> apolloClient.query(LaunchListQuery(Optional.present(response?.data?.launches?.cursor))) },
         merge = { acc, response -> acc + response.data?.launches?.launches?.filterNotNull().orEmpty() },
         hasMore = { response -> response.data?.launches?.hasMore == true },
     )
-    val list by paginationState.list()
     val l = list
     if (l == null) {
         Loading()
     } else {
         LazyColumn {
-            items(l.items) { launch ->
+            items(l) { launch ->
                 LaunchItem(launch = launch, onClick = onLaunchClick)
             }
 
             item {
                 when {
                     l.exception != null -> {
-                        ErrorItem(text = "Error: ${l.exception.message}", onClick = { paginationState.loadMore() })
+                        ErrorItem(text = "Error: ${l.exception.message}", onClick = { l.loadMore() })
                     }
 
                     !l.errors.isNullOrEmpty() -> {
-                        ErrorItem(text = "Error: ${l.errors[0].message}", onClick = { paginationState.loadMore() })
+                        ErrorItem(text = "Error: ${l.errors[0].message}", onClick = { l.loadMore() })
                     }
 
                     l.hasMore -> {
                         LoadingItem()
-                        paginationState.loadMore()
                     }
                 }
             }

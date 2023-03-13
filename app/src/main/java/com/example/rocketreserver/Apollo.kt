@@ -1,6 +1,9 @@
 package com.example.rocketreserver
 
 import android.util.Log
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -66,12 +69,12 @@ fun <D : Operation.Data> ApolloCall<D>.toState(context: CoroutineContext = Empty
 
 
 @Composable
-fun <D : Operation.Data, T : Any> rememberPaginationState(
+fun <D : Operation.Data, T : Any> apolloList(
     nextCall: (response: ApolloResponse<D>?) -> ApolloCall<D>,
     merge: (acc: List<T>, response: ApolloResponse<D>) -> List<T>,
     hasMore: (response: ApolloResponse<D>) -> Boolean,
-): PaginationState<D, T> {
-    return remember { PaginationState(nextCall, merge, hasMore) }
+): State<PaginationState.ApolloList<T>?> {
+    return remember { PaginationState(nextCall, merge, hasMore) }.list()
 }
 
 class PaginationState<D : Operation.Data, T : Any>(
@@ -80,11 +83,16 @@ class PaginationState<D : Operation.Data, T : Any>(
     private val hasMore: (response: ApolloResponse<D>) -> Boolean,
 ) {
     class ApolloList<T : Any>(
+        private val paginationState: PaginationState<*, T>,
         val items: List<T>,
         val exception: Exception?,
         val errors: List<Error>?,
         val hasMore: Boolean,
-    )
+    ) {
+        fun loadMore() {
+            paginationState.loadMore()
+        }
+    }
 
     private var response: ApolloResponse<D>? = null
     private var items: List<T> = emptyList()
@@ -107,7 +115,13 @@ class PaginationState<D : Operation.Data, T : Any>(
         } else {
             hasMore(response!!)
         }
-        return ApolloList(items = items, exception = response!!.exception, errors = response!!.errors, hasMore = _hasMore)
+        return ApolloList(
+            paginationState = this,
+            items = items,
+            exception = response!!.exception,
+            errors = response!!.errors,
+            hasMore = _hasMore
+        )
     }
 
     /**
@@ -125,9 +139,22 @@ class PaginationState<D : Operation.Data, T : Any>(
         return list
     }
 
-    fun loadMore() {
+    private fun loadMore() {
         if (_hasMore) {
             shouldLoadMore.value = true
+        }
+    }
+}
+
+fun <T : Any> LazyListScope.items(
+    apolloList: PaginationState.ApolloList<T>,
+    key: ((item: T) -> Any)? = null,
+    itemContent: @Composable LazyItemScope.(value: T) -> Unit,
+) {
+    items(items = apolloList.items, key = key, itemContent = itemContent)
+    if (apolloList.hasMore) {
+        item {
+            apolloList.loadMore()
         }
     }
 }
