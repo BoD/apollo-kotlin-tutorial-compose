@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.apollographql.apollo3.ApolloCall
@@ -89,38 +88,63 @@ class PaginationState<D : Operation.Data, T : Any>(
         val errors: List<Error>?,
         val hasMore: Boolean,
     ) {
-        fun loadMore() {
+        suspend fun loadMore() {
             paginationState.loadMore()
+        }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as ApolloList<*>
+
+            if (items != other.items) return false
+            if ((exception == null) != (other.exception == null)) return false
+            if (errors != other.errors) return false
+            if (hasMore != other.hasMore) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = items.hashCode()
+            result = 31 * result + (if (exception == null) 0 else 1)
+            result = 31 * result + (errors?.hashCode() ?: 0)
+            result = 31 * result + hasMore.hashCode()
+            return result
         }
     }
 
     private var response: ApolloResponse<D>? = null
-    private var items: List<T> = emptyList()
-    private val shouldLoadMore = mutableStateOf(true)
-    private var _hasMore: Boolean = true
+    private val apolloList = mutableStateOf<ApolloList<T>?>(null)
 
-    private suspend fun doLoadMore(): ApolloList<T> {
+    private suspend fun loadMore() {
+        if (apolloList.value?.hasMore != false) {
+            doLoadMore()
+        }
+    }
+
+    private suspend fun doLoadMore() {
         val call = nextCall(response)
         response = try {
             call.execute()
         } catch (e: ApolloException) {
             ApolloResponse(call = call, exception = e)
         }
-        shouldLoadMore.value = false
-        val itemsBeforeMerging = items
-        items = merge(items, response!!)
-        _hasMore = if (response!!.exception != null || response!!.hasErrors() && itemsBeforeMerging == items) {
+        val items = apolloList.value?.items ?: emptyList()
+        val mergedItems = merge(items, response!!)
+        val hasMore = if (response!!.exception != null || response!!.hasErrors() && items == mergedItems) {
             // Due to an exception or errors, merge could not be done, but there could still be more items
             true
         } else {
             hasMore(response!!)
         }
-        return ApolloList(
+        apolloList.value = ApolloList(
             paginationState = this,
-            items = items,
+            items = mergedItems,
             exception = response!!.exception,
             errors = response!!.errors,
-            hasMore = _hasMore
+            hasMore = hasMore
         )
     }
 
@@ -129,20 +153,10 @@ class PaginationState<D : Operation.Data, T : Any>(
      */
     @Composable
     fun list(): State<ApolloList<T>?> {
-        val list = remember { mutableStateOf<ApolloList<T>?>(null) }
-        val shouldLoadMore by remember { shouldLoadMore }
-        LaunchedEffect(shouldLoadMore) {
-            if (shouldLoadMore) {
-                list.value = doLoadMore()
-            }
+        LaunchedEffect(Unit) {
+            loadMore()
         }
-        return list
-    }
-
-    private fun loadMore() {
-        if (_hasMore) {
-            shouldLoadMore.value = true
-        }
+        return remember { apolloList }
     }
 }
 
@@ -152,9 +166,11 @@ fun <T : Any> LazyListScope.items(
     itemContent: @Composable LazyItemScope.(value: T) -> Unit,
 ) {
     items(items = apolloList.items, key = key, itemContent = itemContent)
-    if (apolloList.hasMore) {
-        item {
-            apolloList.loadMore()
+    item {
+        if (apolloList.hasMore) {
+            LaunchedEffect(Unit) {
+                apolloList.loadMore()
+            }
         }
     }
 }
