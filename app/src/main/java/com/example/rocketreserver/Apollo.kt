@@ -126,11 +126,7 @@ class PaginationState<D : Operation.Data, T : Any>(
 
     private suspend fun doLoadMore() {
         val call = nextCall(response)
-        response = try {
-            call.execute()
-        } catch (e: ApolloException) {
-            ApolloResponse(call = call, exception = e)
-        }
+        response = call.tryExecute()
         val items = apolloList.value?.items ?: emptyList()
         val mergedItems = merge(items, response!!)
         val hasMore = if (response!!.exception != null || response!!.hasErrors() && items == mergedItems) {
@@ -188,3 +184,9 @@ fun <D : Operation.Data> ApolloResponse(call: ApolloCall<D>, exception: ApolloEx
     ApolloResponse.Builder(operation = call.operation, requestUuid = uuid4(), data = null)
         .addExecutionContext(ExceptionElement(exception))
         .build()
+
+suspend fun <D : Operation.Data> ApolloCall<D>.tryExecute(): ApolloResponse<D> = try {
+    execute()
+} catch (e: ApolloException) {
+    ApolloResponse(call = this, exception = e)
+}
