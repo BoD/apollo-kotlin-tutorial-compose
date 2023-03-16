@@ -38,9 +38,9 @@ class ApolloPagingSource<Data : Operation.Data, Value : Any>(
 
     /**
      * Extract the list of items from a response.
-     * Return null to indicate an error.
+     * Throw an exception if the response cannot be used (e.g. it contains GraphQL errors).
      */
-    private val getItems: (response: ApolloResponse<Data>) -> List<Value>?,
+    private val getItems: (response: ApolloResponse<Data>) -> List<Value>,
 ) : PagingSource<ApolloCall<Data>, Value>() {
     override fun getRefreshKey(state: PagingState<ApolloCall<Data>, Value>): ApolloCall<Data>? = null
 
@@ -53,7 +53,11 @@ class ApolloPagingSource<Data : Operation.Data, Value : Any>(
 
         val response = call.tryExecute()
         if (response.exception != null) return LoadResult.Error(response.exception!!)
-        val items = getItems(response) ?: return LoadResult.Error(Exception("getItems returned null"))
+        val items = try {
+            getItems(response)
+        } catch (e: Exception) {
+            return LoadResult.Error(e)
+        }
         return LoadResult.Page(
             data = items,
             prevKey = prependCall?.let { prependCall -> if (hasPreviousPage(response)) prependCall.invoke(response) else null },
@@ -69,7 +73,7 @@ fun <Data : Operation.Data, Value : Any> Pager(
     hasNextPage: (response: ApolloResponse<Data>) -> Boolean,
     prependCall: ((response: ApolloResponse<Data>) -> ApolloCall<Data>)? = null,
     hasPreviousPage: (response: ApolloResponse<Data>) -> Boolean = { false },
-    getItems: (response: ApolloResponse<Data>) -> List<Value>?,
+    getItems: (response: ApolloResponse<Data>) -> List<Value>,
 ): Pager<ApolloCall<Data>, Value> {
     return Pager(
         config = config,
@@ -83,7 +87,7 @@ fun <Data : Operation.Data, Value : Any> rememberAndCollectPager(
     hasNextPage: (response: ApolloResponse<Data>) -> Boolean,
     prependCall: ((response: ApolloResponse<Data>) -> ApolloCall<Data>)? = null,
     hasPreviousPage: (response: ApolloResponse<Data>) -> Boolean = { false },
-    getItems: (response: ApolloResponse<Data>) -> List<Value>?,
+    getItems: (response: ApolloResponse<Data>) -> List<Value>,
 ): LazyPagingItems<Value> {
     val pager = remember { Pager(config, appendCall, hasNextPage, prependCall, hasPreviousPage, getItems) }
     return pager.flow.collectAsLazyPagingItems()

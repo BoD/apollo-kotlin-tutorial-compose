@@ -24,6 +24,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.compose.items
 import coil.compose.AsyncImage
 import com.apollographql.apollo3.api.Optional
+import com.apollographql.apollo3.exception.ApolloException
 
 @Composable
 fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
@@ -36,7 +37,10 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
             response.data?.launches?.hasMore == true
         },
         getItems = { response ->
-            response.data?.launches?.launches?.filterNotNull()
+            if (response.hasErrors()) {
+                throw ApolloException(response.errors!![0].message)
+            }
+            response.data!!.launches.launches.filterNotNull()
         }
     )
     if (lazyPagingItems.loadState.refresh is LoadState.Loading) {
@@ -46,9 +50,17 @@ fun LaunchList(onLaunchClick: (launchId: String) -> Unit) {
             items(lazyPagingItems) { launch ->
                 LaunchItem(launch = launch!!, onClick = onLaunchClick)
             }
-            if (lazyPagingItems.loadState.append == LoadState.Loading) {
-                item {
-                    LoadingItem()
+            item {
+                when (val append = lazyPagingItems.loadState.append) {
+                    is LoadState.Error -> {
+                        ErrorItem(text = "Error: ${append.error.message}", onClick = { lazyPagingItems.retry() })
+                    }
+
+                    LoadState.Loading -> {
+                        LoadingItem()
+                    }
+
+                    else -> {}
                 }
             }
         }
